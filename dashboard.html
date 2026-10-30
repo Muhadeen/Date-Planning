@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muhadeen · Dashboard</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@900&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<script>
+/* Paste the SAME Firebase config as in index.html */
+const FIREBASE_CONFIG={apiKey:"AIzaSyBPCFXfjh-1BA6P1MecUPbAoeX02f_iBlo",authDomain:"date-planning-c57da.firebaseapp.com",projectId:"date-planning-c57da",appId:"1:926976322970:web:78d4756bc28a3bd1479e23"};
+const CONFIGURED=!FIREBASE_CONFIG.apiKey.startsWith("PASTE");
+const loadJs=u=>new Promise((ok,no)=>{const s=document.createElement("script");s.src=u;s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+const store={configured:CONFIGURED,
+ async list(c){const snap=await firebase.firestore().collection(c).orderBy("ts","desc").get();return snap.docs.map(d=>{const v=d.data();v.ts=v.ts?v.ts.toMillis():0;return v})},
+ login:(e,p)=>firebase.auth().signInWithEmailAndPassword(e,p),logout:()=>firebase.auth().signOut(),onAuth:cb=>firebase.auth().onAuthStateChanged(cb)};
+</script>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font-family:Nunito,sans-serif;background:#2a0b45;color:#2a0b45;min-height:100vh;padding:20px}
+.wrap{max-width:1000px;margin:auto}
+h1{font-family:Fraunces,serif;color:#fff;font-size:2rem;margin-bottom:4px}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+button,input{font:800 1rem Nunito,sans-serif;border:3px solid #2a0b45;border-radius:12px;padding:10px 16px}
+button{background:#ffc857;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.stat{border-radius:20px;padding:16px;color:#2a0b45}
+.stat b{display:block;font:900 2.4rem Fraunces,serif}
+.stat:nth-child(1){background:#4cc9f0}.stat:nth-child(2){background:#2fd6a0}.stat:nth-child(3){background:#ffc857}.stat:nth-child(4){background:#ff5d73}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.res{background:#fffaf3;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.res .head{display:flex;gap:12px;align-items:center}
+.res img,.av{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #2a0b45;background:#ddd;display:grid;place-items:center;font-size:2rem;cursor:zoom-in}
+.res h3{font-size:1.15rem}.when{font-weight:800;background:#2a0b45;color:#fff;border-radius:12px;padding:8px 12px}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid #2a0b45;vertical-align:-2px}
+small{opacity:.65;font-weight:700}
+#login{max-width:360px;margin:12vh auto;background:#fffaf3;border-radius:24px;padding:26px;display:grid;gap:12px}
+.hide{display:none!important}
+.empty{color:#fff;opacity:.8;font-weight:700}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;place-items:center;z-index:9}#lb img{max-width:92vw;max-height:90vh;border-radius:16px}
+</style></head><body>
+<div class="wrap">
+ <div id="login" class="hide">
+  <h2 style="font-family:Fraunces,serif">Muhadeen's dashboard</h2>
+  <input type="email" id="em" placeholder="Email"><input type="password" id="pw" placeholder="Password">
+  <button id="go">Log in</button><small id="err" style="color:#c1121f"></small>
+ </div>
+ <div id="app" class="hide">
+  <div class="top"><div><h1>Dashboard 💌</h1><small style="color:#fff" id="mode"></small></div><div><button id="refresh">Refresh</button> <button id="out">Log out</button></div></div>
+  <div class="stats">
+   <div class="stat"><b id="sV">0</b>Link opens</div>
+   <div class="stat"><b id="sY">0</b>Pressed YES</div>
+   <div class="stat"><b id="sD">0</b>Dates booked</div>
+   <div class="stat"><b id="sN">0</b>NO button escapes 😂</div>
+  </div>
+  <div class="list" id="list"></div>
+ </div>
+</div>
+<div id="lb" onclick="this.style.display='none'"><img id="lbi" alt=""></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const COL={Red:"#e63946",Pink:"#ff7eb6",Orange:"#ff8c1a",Yellow:"#ffd23f",Green:"#2fb86b",Blue:"#2d6cdf",Purple:"#8e44ad",White:"#fff",Black:"#111",Gold:"#d4a017",Brown:"#8b5a2b"};
+async function load(){
+  const [ev,rs]=await Promise.all([store.list("events"),store.list("responses")]);
+  $("#sV").textContent=ev.filter(e=>e.type==="visit").length;
+  $("#sY").textContent=ev.filter(e=>e.type==="yes").length;
+  $("#sD").textContent=rs.length;
+  $("#sN").textContent=ev.filter(e=>e.type==="yes").reduce((a,e)=>a+(e.dodges||0),0);
+  $("#list").innerHTML=rs.length?rs.map(r=>`<article class="res">
+    <div class="head">${r.photo?`<img src="${r.photo}" alt="" onclick="zoom(this.src)">`:`<div class="av">🙂</div>`}
+    <div><h3>${esc(r.name)||"<i>No name given</i>"}</h3><small>${r.ts?new Date(r.ts).toLocaleString():""}</small></div></div>
+    <div class="when">${esc(r.dateNice)}, ${esc(r.time)}<br>${esc(r.restaurant)}</div>
+    <div>🍽️ ${(r.foods||[]).map(esc).join(", ")}</div>
+    <div>👗 ${esc(r.dress)} · <span class="dot" style="background:${COL[r.color]||"#999"}"></span> ${esc(r.color)}</div>
+    <small>Tried NO ${r.dodges||0} times</small></article>`).join(""):`<p class="empty">No bookings yet. Share the link!</p>`;
+}
+function zoom(src){$("#lbi").src=src;$("#lb").style.display="grid"}
+function start(){$("#login").classList.add("hide");$("#app").classList.remove("hide");
+  $("#mode").textContent=store.configured?"Live data":"DEMO MODE – showing only data from this browser. Set up Firebase";load()}
+$("#refresh").onclick=load;
+(async()=>{
+if(store.configured){const b="https://www.gstatic.com/firebasejs/10.12.2/";await loadJs(b+"firebase-app-compat.js");await loadJs(b+"firebase-firestore-compat.js");await loadJs(b+"firebase-auth-compat.js");firebase.initializeApp(FIREBASE_CONFIG);
+  store.onAuth(u=>{if(u)start();else{$("#app").classList.add("hide");$("#login").classList.remove("hide")}});
+  $("#go").onclick=()=>store.login($("#em").value,$("#pw").value).catch(e=>$("#err").textContent="Wrong email or password");
+  $("#out").onclick=()=>store.logout();
+}else{$("#login").classList.remove("hide");$("#err").textContent="Firebase not set up yet. Paste your config at the top of this file."}
+})();
+</script></body></html>
